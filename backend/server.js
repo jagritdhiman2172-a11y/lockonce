@@ -1,5 +1,4 @@
 const cors = require("cors");
-
 const session = require("express-session");
 const pgSession = require("connect-pg-simple")(session);
 const express = require("express");
@@ -9,24 +8,33 @@ require("dotenv").config();
 const db = require("./config/db");
 
 const app = express();
+
+// Trust Render's proxy for secure session cookies
+app.set("trust proxy", 1);
+
 const allowedOrigins = [
-  "http://localhost:3000",
-  "http://localhost:3001",
-  "http://localhost:3002",
-  "http://127.0.0.1:3000",
-  "http://127.0.0.1:3001",
-  process.env.CLIENT_URL
+    "http://localhost:3000",
+    "http://localhost:3001",
+    "http://localhost:3002",
+    "http://127.0.0.1:3000",
+    "http://127.0.0.1:3001",
+    "https://lockonce-a3son7xjw-jagrit9.vercel.app",
+    process.env.CLIENT_URL
 ].filter(Boolean);
 
+// CORS configuration
 app.use(cors({
-  origin: (origin, callback) => {
-    if (!origin || allowedOrigins.includes(origin)) {
-      return callback(null, true);
-    }
-    return callback(null, true); // Permissive in dev to prevent port mismatch blocking
-  },
-  credentials: true
+    origin: (origin, callback) => {
+        if (!origin || allowedOrigins.includes(origin)) {
+            return callback(null, true);
+        }
+
+        return callback(new Error("Not allowed by CORS"));
+    },
+    credentials: true
 }));
+
+// Session configuration
 app.use(session({
     store: new pgSession({
         pool: db,
@@ -37,44 +45,54 @@ app.use(session({
     saveUninitialized: false,
     cookie: {
         httpOnly: true,
-        secure: false,
+        secure: process.env.NODE_ENV === "production",
+        sameSite: process.env.NODE_ENV === "production" ? "none" : "lax",
         maxAge: 1000 * 60 * 60 * 24
     }
 }));
 
 app.use(express.urlencoded({ extended: true }));
 app.use(express.json());
+
+// API routes
 app.use("/auth", require("./routes/authRoutes"));
 app.use("/events", require("./routes/eventRoutes"));
 app.use("/bookings", require("./routes/bookingRoutes"));
+
+// Static files
 app.set("view engine", "ejs");
 app.set("views", path.join(__dirname, "views"));
-
 app.use(express.static(path.join(__dirname, "public")));
 
+// Home route
 app.get("/", (req, res) => {
-    res.send("SEATLOCK SERVER IS RUNNING!");
+    res.send("LOCKONCE SERVER IS RUNNING!");
 });
 
+// Health check
 app.get("/health", async (req, res) => {
     try {
         const result = await db.query("SELECT NOW()");
 
         res.json({
             status: "success",
-            message: "SeatLock backend and database are working",
+            message: "LockOnce backend and database are working",
             databaseTime: result.rows[0].now
         });
+
     } catch (error) {
+        console.error("Database health check failed:", error.message);
+
         res.status(500).json({
             status: "error",
-            message: error.message
+            message: "Database connection failed"
         });
     }
 });
 
+// Start server
 const PORT = process.env.PORT || 3000;
 
 app.listen(PORT, () => {
-    console.log(`SeatLock running at http://localhost:${PORT}`);
+    console.log(`LockOnce running on port ${PORT}`);
 });
