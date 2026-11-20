@@ -71,23 +71,23 @@ app.get("/", (req, res) => {
 
 // Health check
 app.get("/health", async (req, res) => {
-    try {
-        const result = await db.query("SELECT NOW()");
+  try {
+    const result = await db.query("SELECT NOW()");
 
-        res.json({
-            status: "success",
-            message: "LockOnce backend and database are working",
-            databaseTime: result.rows[0].now
-        });
+    res.json({
+      status: "success",
+      message: "LockOnce backend and database are working",
+      databaseTime: result.rows[0].now
+    });
+  } catch (error) {
+    console.error("DATABASE HEALTH CHECK ERROR:", error);
 
-    } catch (error) {
-        console.error("Database health check failed:", error.message);
-
-        res.status(500).json({
-            status: "error",
-            message: "Database connection failed"
-        });
-    }
+    res.status(500).json({
+      status: "error",
+      message: error.message || "Unknown database error",
+      code: error.code || "UNKNOWN"
+    });
+  }
 });
 
 // Start server
